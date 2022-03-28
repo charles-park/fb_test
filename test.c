@@ -66,46 +66,6 @@ unsigned char opt_clear = 0, opt_fill = 0, opt_info = 0, opt_font = 0;
 #endif
 
 //------------------------------------------------------------------------------
-void dump_vscreeninfo(struct fb_var_screeninfo *fvsi)
-{
-	printf("======= FB VAR SCREENINFO =======\n");
-	printf("xres: %d\n", fvsi->xres);
-	printf("yres: %d\n", fvsi->yres);
-	printf("yres_virtual: %d\n", fvsi->yres_virtual);
-	printf("buffer number: %d\n", fvsi->yres_virtual / fvsi->yres);
-	printf("bpp : %d\n", fvsi->bits_per_pixel);
-	printf("red bits    :\n");
-	printf("    offset   : %d\n", fvsi->red.offset);
-	printf("    length   : %d\n", fvsi->red.length);
-	printf("    msb_right: %d\n", fvsi->red.msb_right);
-	printf("green bits  :\n");
-	printf("    offset   : %d\n", fvsi->green.offset);
-	printf("    length   : %d\n", fvsi->green.length);
-	printf("    msb_right: %d\n", fvsi->green.msb_right);
-	printf("blue bits   :\n");
-	printf("    offset   : %d\n", fvsi->blue.offset);
-	printf("    length   : %d\n", fvsi->blue.length);
-	printf("    msb_right: %d\n", fvsi->blue.msb_right);
-	printf("transp bits :\n");
-	printf("    offset   : %d\n", fvsi->transp.offset);
-	printf("    length   : %d\n", fvsi->transp.length);
-	printf("    msb_right: %d\n", fvsi->transp.msb_right);
-
-	printf("=================================\n");
-}
-
-//------------------------------------------------------------------------------
-void dump_fscreeninfo(struct fb_fix_screeninfo *ffsi)
-{
-	printf("======= FB FIX SCREENINFO =======\n");
-	printf("id          : %s\n", ffsi->id);
-	printf("smem_start  : 0x%08lX\n", ffsi->smem_start);
-	printf("smem_len    : %u\n", ffsi->smem_len);
-	printf("line_length : %u\n", ffsi->line_length);
-	printf("=================================\n");
-}
-
-//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 static void print_usage(const char *prog)
 {
@@ -284,7 +244,6 @@ void dump_fb_info (struct fb_config *fb)
 }
 
 //------------------------------------------------------------------------------
-
 int main(int argc, char **argv)
 {
 	struct fb_config fb;
