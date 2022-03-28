@@ -7,10 +7,10 @@ LDFLAGS = -L/usr/local/lib
 # LDLIBS  = -lwiringPi -lwiringPiDev -lpthread -lm -lrt -lcrypt
 
 # 폴더이름으로 실행파일 생성
-# TARGET  := $(notdir $(shell pwd))
+TARGET  := $(notdir $(shell pwd))
 
 # 정의되어진 이름으로 실행파일 생성
-TARGET := glib
+# TARGET := test
 
 SRC_DIRS = .
 # SRCS     = $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
