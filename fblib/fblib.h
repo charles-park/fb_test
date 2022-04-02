@@ -6,6 +6,7 @@
 #ifndef __FB_LIB_H__
 #define __FB_LIB_H__
 
+#include "../typedefs.h"
 //-----------------------------------------------------------------------------
 // Color table & convert macro
 //-----------------------------------------------------------------------------
@@ -39,7 +40,7 @@
 //-----------------------------------------------------------------------------
 // Frame buffer struct
 //-----------------------------------------------------------------------------
-union fb_color {
+typedef union fb_color__u {
     struct {
         unsigned int    b:8;    // lsb
         unsigned int    g:8;
@@ -47,31 +48,18 @@ union fb_color {
         unsigned int    a:8;
     } bits;
     unsigned int uint;
-};
+}	fb_color_u;
 
-struct fb_config
-{
-	int fd;
-	int width;
-	int height;
-	int height_virtual;
-	int bpp;
-	int stride;
-	int red_offset;
-	int red_length;
-	int green_offset;
-	int green_length;
-	int blue_offset;
-	int blue_length;
-	int transp_offset;
-	int transp_length;
-	int buffer_num;
-	char *data;
-	char *base;
-
-    union fb_color bg_color, fg_color;
-    int line_thickness, font_scale;
-};
+typedef struct fb_info__t {
+	int			fd;
+	int			w;
+	int			h;
+	int			stride;
+	int			bpp;
+	bool		is_bgr;
+	char		*base;
+	char		*data;
+}	fb_info_t;
 
 //-----------------------------------------------------------------------------
 #define FONT_HANGUL_WIDTH   16
@@ -89,19 +77,17 @@ enum eFONTS_HANGUL {
 
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
-extern void draw_text      (struct fb_config *fb, int x, int y, unsigned int color, char *fmt, ...);
-extern void draw_line      (struct fb_config *fb, int x, int y, int w);
-extern void draw_rect      (struct fb_config *fb, int x, int y, int w, int h);
-extern void draw_fill_rect (struct fb_config *fb, int x, int y, int w, int h);
+extern void         put_pixel 	(fb_info_t *fb, int x, int y, int color);
+extern void         draw_text 	(fb_info_t *fb, int x, int y,
+									int f_color, int b_color, int scale, char *fmt, ...);
+extern void         draw_line 	(fb_info_t *fb, int x, int y, int w, int color);
+extern void         draw_rect 	(fb_info_t *fb, int x, int y, int w, int h, int lw, int color);
+extern void         draw_fill_rect (fb_info_t *fb, int x, int y, int w, int h, int color);
+extern void         set_font	(enum eFONTS_HANGUL s_font);
+extern void         fb_clear 	(fb_info_t *fb);
+extern void         fb_close 	(fb_info_t *fb);
+extern fb_info_t    *fb_init 	(const char *DEVICE_NAME);
 
-extern void set_fg_color   (struct fb_config *fb, unsigned int color);
-extern void set_bg_color   (struct fb_config *fb, unsigned int color);
-extern void set_line_width (struct fb_config *fb, int thickness);
-extern void set_font       (enum eFONTS_HANGUL s_font);
-extern void set_font_scale (struct fb_config *fb, unsigned int scale);
-
-extern void fb_clear       (struct fb_config *fb);
-extern int  fb_init        (struct fb_config *fb, const char *DEVICE_NAME);
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
 #endif  // #define __FB_LIB_H__

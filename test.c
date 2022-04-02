@@ -48,6 +48,7 @@
 #include <linux/fb.h>
 #include <getopt.h>
 
+#include "typedefs.h"
 #include "fblib/fblib.h"
 
 //------------------------------------------------------------------------------
@@ -57,13 +58,6 @@ const char *OPT_TEXT_STR = "FrameBuffer 테스트 프로그램입니다.";
 unsigned int opt_x = 0, opt_y = 0, opt_width = 0, opt_height = 0, opt_color = 0;
 unsigned char opt_red = 0, opt_green = 0, opt_blue = 0, opt_thckness = 1, opt_scale = 1;
 unsigned char opt_clear = 0, opt_fill = 0, opt_info = 0, opt_font = 0;
-
-//------------------------------------------------------------------------------
-#if defined(__DEBUG__)
-	#define	dbg(fmt, args...)	fprintf(stderr,"%s(%d) : " fmt, __func__, __LINE__, ##args)
-#else
-	#define	dbg(fmt, args...)
-#endif
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
@@ -206,109 +200,86 @@ int disable_blink_cursor(void)
 }
 
 //------------------------------------------------------------------------------
-void dump_fb_info (struct fb_config *fb)
+void dump_fb_info (fb_info_t *fb)
 {
 	printf("========== FB SCREENINFO ==========\n");
-	printf("xres: %d\n", fb->width);
-	printf("yres: %d\n", fb->height);
-	printf("bpp : %d\n", fb->bpp);
+	printf("xres   : %d\n", fb->w);
+	printf("yres   : %d\n", fb->h);
+	printf("bpp    : %d\n", fb->bpp);
 	printf("stride : %d\n", fb->stride);
-	printf("yres_virtual: %d\n", fb->height_virtual);
-	printf("buffer number: %d\n", fb->buffer_num);
-	printf("red bits    :\n");
-	printf("    offset   : %d\n", fb->red_offset);
-	printf("    length   : %d\n", fb->red_length);
-	printf("green bits  :\n");
-	printf("    offset   : %d\n", fb->green_offset);
-	printf("    length   : %d\n", fb->green_length);
-	printf("blue bits   :\n");
-	printf("    offset   : %d\n", fb->blue_offset);
-	printf("    length   : %d\n", fb->blue_length);
-	printf("transp bits :\n");
-	printf("    offset   : %d\n", fb->transp_offset);
-	printf("    length   : %d\n", fb->transp_length);
+	printf("bgr    : %d\n", fb->is_bgr);
 	printf("fb_base     : %p\n", fb->base);
-	printf("smem_start  : %p\n", fb->data);
-	printf("==================================\n");
-	printf("fg_color : 0x%08X\n", fb->fg_color.uint);
-	printf("          R : 0x%02X\n", fb->fg_color.bits.r);
-	printf("          G : 0x%02X\n", fb->fg_color.bits.g);
-	printf("          B : 0x%02X\n", fb->fg_color.bits.b);
-	printf("bg_color : 0x%08X\n", fb->bg_color.uint);
-	printf("          R : 0x%02X\n", fb->fg_color.bits.r);
-	printf("          G : 0x%02X\n", fb->fg_color.bits.g);
-	printf("          B : 0x%02X\n", fb->fg_color.bits.b);
-	printf("font_scale  : 0x%02d\n" , fb->font_scale);
-	printf("line thickness : 0x%02d\n", fb->line_thickness);
+	printf("fb_data     : %p\n", fb->data);
 	printf("==================================\n");
 }
 
 //------------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
-	struct fb_config fb;
+	fb_info_t	*pfb;
+	int f_color, b_color;
 
     parse_opts(argc, argv);
 
     if (disable_blink_cursor ())
 		exit(1);
 
-    fb_init (&fb, OPT_DEVICE_NAME);
+    if ((pfb = fb_init (OPT_DEVICE_NAME)) == NULL) {
+		err("frame buffer init fail!\n");
+		exit(1);
+	}
 
-    set_fg_color  (&fb, RGB_TO_UINT(opt_red, opt_green, opt_blue));
-    set_bg_color  (&fb, COLOR_WHITE);
-    set_font_scale(&fb, opt_scale);
+	f_color = RGB_TO_UINT(opt_red, opt_green, opt_blue);
+	b_color = COLOR_WHITE;
 
     if (opt_color)
-        set_bg_color (&fb, opt_color & 0xFFFFFF);
+        b_color = opt_color & 0x00FFFFFF;
 
     if (opt_clear)
-        fb_clear(&fb);
-
-    fb.line_thickness = opt_thckness;
+        fb_clear(pfb);
 
 	if (opt_info)
-		dump_fb_info(&fb);
+		dump_fb_info(pfb);
 
     if (OPT_TEXT_STR) {
 		set_font(opt_font);
 		switch(opt_font) {
 			default :
 			case eFONT_HAN_DEFAULT:
-				draw_text(&fb, 0, fb.height / 2, fb.fg_color.uint, 
+				draw_text(pfb, 0, pfb->h / 2, f_color, b_color, opt_scale,
 					"한글폰트는 명조체 이며, Font Scale은 %d배 입니다.", opt_scale);
 			break;
 			case eFONT_HANBOOT:
-				draw_text(&fb, 0, fb.height / 2, fb.fg_color.uint, 
+				draw_text(pfb, 0, pfb->h / 2, f_color, b_color, opt_scale,
 					"한글폰트는 붓글씨체 이며, Font Scale은 %d배 입니다.", opt_scale);
 			break;
 			case eFONT_HANGODIC:
-				draw_text(&fb, 0, fb.height / 2, fb.fg_color.uint, 
+				draw_text(pfb, 0, pfb->h / 2, f_color, b_color, opt_scale,
 					"한글폰트는 고딕체 이며, Font Scale은 %d배 입니다.", opt_scale);
 			break;
 			case eFONT_HANPIL:
-				draw_text(&fb, 0, fb.height / 2, fb.fg_color.uint, 
+				draw_text(pfb, 0, pfb->h / 2, f_color, b_color, opt_scale,
 					"한글폰트는 필기체 이며, Font Scale은 %d배 입니다.", opt_scale);
 			break;
 			case eFONT_HANSOFT:
-				draw_text(&fb, 0, fb.height / 2, fb.fg_color.uint, 
+				draw_text(pfb, 0, pfb->h / 2, f_color, b_color, opt_scale,
 					"한글폰트는 한소프트체 이며, Font Scale은 %d배 입니다.", opt_scale);
 			break;
 		}
-        draw_text(&fb, opt_x, opt_y, fb.fg_color.uint, "%s", OPT_TEXT_STR);
+        draw_text(pfb, opt_x, opt_y, f_color, b_color, opt_scale, "%s", OPT_TEXT_STR);
 	}
 
     if (opt_width) {
         if (opt_height) {
             if (opt_fill)
-                draw_fill_rect(&fb, opt_x, opt_y, opt_width, opt_height);
+                draw_fill_rect(pfb, opt_x, opt_y, opt_width, opt_height, f_color);
             else
-                draw_rect(&fb, opt_x, opt_y, opt_width, opt_height);
+                draw_rect(pfb, opt_x, opt_y, opt_width, opt_height, opt_thckness, f_color);
         }
         else
-            draw_line(&fb, opt_x, opt_y, opt_width);
+            draw_line(pfb, opt_x, opt_y, opt_width, f_color);
     }
-	close (fb.fd);
+	fb_close (pfb);
 
 	return 0;
 }
