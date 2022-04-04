@@ -51,6 +51,7 @@
 #include "typedefs.h"
 #include "fblib/fblib.h"
 
+#include "ui_parser.h"
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 const char *OPT_DEVICE_NAME = "/dev/fb0";
@@ -218,6 +219,7 @@ int main(int argc, char **argv)
 {
 	fb_info_t	*pfb;
 	int f_color, b_color;
+	ui_grp_t 	*ui_grp;
 
     parse_opts(argc, argv);
 
@@ -229,6 +231,11 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	if ((ui_grp = ui_init (pfb, "ui.cfg")) == NULL) {
+		err("User interface create fail!\n");
+		exit(1);
+	}
+	
 	f_color = RGB_TO_UINT(opt_red, opt_green, opt_blue);
 	b_color = COLOR_WHITE;
 
@@ -279,6 +286,20 @@ int main(int argc, char **argv)
         else
             draw_line(pfb, opt_x, opt_y, opt_width, f_color);
     }
+
+	ui_update(pfb, ui_grp, -1);
+
+{
+	int i = 0;
+	for (i = 0; i < 1000; i++) {
+		memset(ui_grp->s_item[1].str, 0x00, sizeof(ui_grp->s_item[1].str));
+		ui_grp->s_item[i].scale = 2;
+		sprintf(ui_grp->s_item[1].str, "count = %d", i);
+//		ui_update_str(pfb, ui_grp, 1);
+		usleep(10000);
+	}
+}
+//	ui_close(ui_grp);
 	fb_close (pfb);
 
 	return 0;

@@ -1,6 +1,6 @@
 CC      = gcc
 CFLAGS  = -W -Wall -g
-# CFLAGS  += -D__DEBUG__
+CFLAGS  += -D__DEBUG__
 
 INCLUDE = -I/usr/local/include
 LDFLAGS = -L/usr/local/lib
