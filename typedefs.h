@@ -13,7 +13,7 @@
 	#define	dbg(fmt, args...)
 #endif
 
-#define	err(fmt, args...)	fprintf(stderr,"[err : %s] : " fmt, __func__, ##args)
+#define	err(fmt, args...)	fprintf(stderr,"[ %s (%s - %d)][err] : " fmt, __FILE__, __func__, __LINE__, ##args)
 #define	info(fmt, args...)	fprintf(stdout,"[INFO] : " fmt, ##args)
 
 //------------------------------------------------------------------------------------------------

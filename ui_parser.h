@@ -10,17 +10,18 @@
 //------------------------------------------------------------------------------
 typedef struct rect_item__t {
 	int				id, x, y, w, h, lw;
-	fb_color_u		c, lc;
+	fb_color_u		rc, lc;
 }	r_item_t;
 
 typedef struct string_item__t {
 	int				r_id, x_off, y_off, scale;
-	fb_color_u		c;
+	fb_color_u		fc;
 	char            str[ITEM_STR_MAX];
 }	s_item_t;
 
 typedef struct ui_group__t {
-	int             r_cnt, s_cnt;
+	int             r_cnt, s_cnt, f_type;
+    fb_color_u      fc, rc, lc;
 	r_item_t		r_item[ITEM_COUNT_MAX];
 	s_item_t		s_item[ITEM_COUNT_MAX];
 }	ui_grp_t;

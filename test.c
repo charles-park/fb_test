@@ -288,19 +288,17 @@ int main(int argc, char **argv)
     }
 
 	ui_update(pfb, ui_grp, -1);
+	sleep(1);
 
 {
 	int i = 0;
-	for (i = 0; i < 1000; i++) {
-		memset(ui_grp->s_item[1].str, 0x00, sizeof(ui_grp->s_item[1].str));
-		ui_grp->s_item[i].scale = 2;
-		sprintf(ui_grp->s_item[1].str, "count = %d", i);
-//		ui_update_str(pfb, ui_grp, 1);
-		usleep(10000);
+	for (i = 100; i > 0; i--) {
+		ui_set_str(pfb, ui_grp, -1, -1, "count = %d", i);
+		usleep(100000);
 	}
 }
-//	ui_close(ui_grp);
 	fb_close (pfb);
+	ui_close(ui_grp);
 
 	return 0;
 }
