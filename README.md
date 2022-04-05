@@ -27,8 +27,11 @@ setterm -blank 0 -powersave off 2>/dev/null
 systemctl edit getty@tty1
 
 [Service]
+
 ExecStart=
+
 ExecStart=-/sbin/agetty --noissue --autologin myusername %I $TERM
+
 Type=idle
 
 저장하고 나옴. Ctrl+K Q or Ctrl+K H help
