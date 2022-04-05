@@ -62,66 +62,41 @@
    '#' : commant
    'R' : Rect data
    'S' : string data
-   'D' : default data
+   'C' : default config data
    'L' : Line data
+   'G' : Rect group data
 
-   모든 좌표는 비율값 (0%~100%), lw(out line width) 외곽라인 두께, 
-   c/lc 컬러/외곽라인컬러는 ARBG값(32bits).
+   Rect data x, y, w, h는 fb의 비율값 (0%~100%), 모든 컬러값은 32bits rgb data.
 
-   [파일 내용]
-   type(char), id(int), x(int), y(int), w(int), h(int), c(int), lw(int), lc(int)
-
-   FB info : 800(x) x 480(y) 의 경우
-   eg) 'R', 0, 0, 0, 10, 5, 0x00FFFFFF, 0, 0
-   id - 0, 외곽라인이 없는 흰색 box. x = 0, w = 800 * 10 / 100, y = 0, h = 480 * 5 / 100
-   eg) 'R', 1, 10, 5, 10, 5, 0x00FFFFFF, 2, 0x00FF0000
-   id = 1, 2 pixel의 빨간 외곽라인이 있는 흰색 box.
-   x = 800 * 10 / 100, y = 480 * 5 / 100,  w = 800 * 10 / 100, y = 0, h = 480 * 5 / 100
+   ui.cfg file 참조
 */
 
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
-static void _ui_str_scale (ui_grp_t *ui_grp, int id, int *pscale)
+static int _ui_str_scale (int w, int h, int lw, int slen)
 {
-   int i, w, h;
+   int as, w_len, h_len;
 
-   for (i = 0; i < ui_grp->r_cnt; i++) {
-      if (id == ui_grp->r_item[i].id) {
-         w = ui_grp->r_item[i].w;   h = ui_grp->r_item[i].h;
-      }
+   for (as = 1; as < 5; as++) {
+      w_len = slen * FONT_ASCII_WIDTH * as;
+      h_len = FONT_HEIGHT * as + lw * 2;
+
+      if ((slen > w) || (h_len > h))
+         return (as -1);
    }
-
-   for (i = 0; i < ui_grp->s_cnt; i++) {
-      if (id == ui_grp->s_item[i].r_id) {
-            if (ui_grp->s_item[i].scale < 0) {
-               int slen = strlen(ui_grp->s_item[i].str);
-               int hlen = FONT_HEIGHT;
-               int as;
-
-               for (as = 1; as < 5; as++) {
-                  slen = slen * FONT_ASCII_WIDTH * as;
-                  hlen = hlen * as;
-                  if ((slen > w) || (hlen > h)) {
-                     *pscale = as - 1;
-                     break;
-                  }
-               }
-            }
-            else
-               *pscale = ui_grp->s_item[i].scale;
-      }
-   }
+   return 1;
 }
 
 //------------------------------------------------------------------------------
 static void _ui_str_pos_xy (ui_grp_t *ui_grp, int id, int *px, int *py)
 {
-   int i, x, y, w, h;
+   int i, x, y, w, h, lw;
 
    for (i = 0; i < ui_grp->r_cnt; i++) {
       if (id == ui_grp->r_item[i].id) {
-         x = ui_grp->r_item[i].x;   y = ui_grp->r_item[i].y;
-         w = ui_grp->r_item[i].w;   h = ui_grp->r_item[i].h;
+         x  = ui_grp->r_item[i].x;  y = ui_grp->r_item[i].y;
+         w  = ui_grp->r_item[i].w;  h = ui_grp->r_item[i].h;
+         lw = ui_grp->r_item[i].lw;
       }
    }
 
@@ -129,6 +104,10 @@ static void _ui_str_pos_xy (ui_grp_t *ui_grp, int id, int *px, int *py)
       if (id == ui_grp->s_item[i].r_id) {
 
          int slen = strlen(ui_grp->s_item[i].str);
+
+         /* scale = -1 이면 최대 스케일을 구하여 표시한다 */
+         if (ui_grp->s_item[i].scale < 0)
+            ui_grp->s_item[i].scale = _ui_str_scale (w, h, lw, slen);
 
          if (ui_grp->s_item[i].x_off < 0) {
             int slen = strlen(ui_grp->s_item[i].str);
@@ -172,14 +151,12 @@ static void _ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
 
    for (i = 0; i < ui_grp->s_cnt; i++) {
       if (id == ui_grp->s_item[i].r_id) {
-         int x, y, scale;
+         int x, y;
 
          _ui_str_pos_xy(ui_grp, id, &x, &y);
-         _ui_str_scale (ui_grp, id, &scale);
-
          draw_text (fb,
             x, y, ui_grp->s_item[i].fc.uint, color,
-            scale, ui_grp->s_item[i].str);
+            ui_grp->s_item[i].scale, ui_grp->s_item[i].str);
       }
    }
 }
@@ -202,7 +179,7 @@ void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
          vsprintf(buf, fmt, va);
          va_end(va);
 
-         ui_grp->s_item[i].scale = scale < 0 ? 1 : scale;
+         ui_grp->s_item[i].scale = scale;
 
          if (strlen(ui_grp->s_item[i].str) > strlen(buf)) {
             /* 기존 String을 배경색으로 다시 그림(텍스트 지움) */
@@ -349,7 +326,37 @@ static void _ui_parser_cmd_S (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 //------------------------------------------------------------------------------
 static void _ui_parser_cmd_G (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 {
+   int pos = ui_grp->r_cnt;
+   int s_h, r_h, sid, r_cnt, g_cnt, rc, lw, lc, i, j, y_s;
+   char *ptr = strtok (buf, ",");
 
+   ptr = strtok (NULL, ",");     sid   = atoi(ptr);
+   ptr = strtok (NULL, ",");     r_cnt = atoi(ptr);
+   ptr = strtok (NULL, ",");     s_h   = atoi(ptr);
+   ptr = strtok (NULL, ",");     r_h   = atoi(ptr);
+   ptr = strtok (NULL, ",");     g_cnt = atoi(ptr);
+   ptr = strtok (NULL, ",");     rc    = strtol(ptr, NULL, 16);
+   ptr = strtok (NULL, ",");     lw    = atoi(ptr);
+   ptr = strtok (NULL, ",");     lc    = strtol(ptr, NULL, 16);
+
+   for (i = 0; i < g_cnt; i++) {
+      for (j = 0; j < r_cnt; j++) {
+         pos = ui_grp->r_cnt + j + i * r_cnt;
+
+         ui_grp->r_item[pos].w = (fb->w / r_cnt);
+         y_s                   = (fb->h * s_h) / 100;
+         ui_grp->r_item[pos].h = (fb->h * r_h) / 100;
+
+         ui_grp->r_item[pos].id = sid + j + i * r_cnt;
+         ui_grp->r_item[pos].x  = ui_grp->r_item[pos].w * j;
+         ui_grp->r_item[pos].y  = ui_grp->r_item[pos].h * i + y_s;
+         ui_grp->r_item[pos].lw = lw;
+
+         ui_grp->r_item[pos].rc.uint = rc < 0 ? ui_grp->rc.uint : rc;
+         ui_grp->r_item[pos].lc.uint = lc < 0 ? ui_grp->lc.uint : lc;
+      }
+   }
+   ui_grp->r_cnt = pos +1;
 }
 
 //------------------------------------------------------------------------------
@@ -385,6 +392,12 @@ ui_grp_t *ui_init (fb_info_t *fb, const char *cfg_filename)
          break;
       }
       memset (buf, 0x00, sizeof(buf));
+   }
+
+   if (!is_cfg_file) {
+      err("UI Config File not found! (filename = %s)\n", cfg_filename);
+      free (ui_grp);
+      return NULL;
    }
 
    /* all item update */
