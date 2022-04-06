@@ -14,8 +14,8 @@ typedef struct rect_item__t {
 }	r_item_t;
 
 typedef struct string_item__t {
-	int				r_id, x_off, y_off, scale;
-	fb_color_u		fc;
+	int				r_id, x_off, y_off, scale, f_type;
+	fb_color_u		fc, bc;
 	char            str[ITEM_STR_MAX];
 }	s_item_t;
 
