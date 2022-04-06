@@ -294,8 +294,8 @@ int main(int argc, char **argv)
 	int i = 0;
 	for (i = 100; i > 0; i--) {
 //void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
-//                  int id, int scale, char *fmt, ...)
-		ui_set_str(pfb, ui_grp, 1, -1, 2, "테스트 count = %d", i);
+//                  int id, int x, int y, int scale, int font, char *fmt, ...)
+		ui_set_str(pfb, ui_grp, 1, -1, -1, -1, 2, "테스트 count = %d", i);
 		usleep(100000);
 	}
 }

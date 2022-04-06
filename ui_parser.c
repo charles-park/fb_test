@@ -115,43 +115,44 @@ static s_item_t *_ui_find_s_item (ui_grp_t *ui_grp, int *sid, int fid)
 }
 
 //------------------------------------------------------------------------------
-static void _ui_str_pos_xy (ui_grp_t *ui_grp, int id, int *px, int *py)
+static void _ui_str_pos_xy (r_item_t *r_item, s_item_t *s_item)
 {
-   int n_rid = 0, n_sid = 0;
+   int slen = strlen(s_item->str);
 
-   r_item_t *r_item;
-   s_item_t *s_item;
+   /* scale = -1 이면 최대 스케일을 구하여 표시한다 */
+   if (s_item->scale < 0)
+      s_item->scale = _ui_str_scale (r_item->w, r_item->h,
+                                    r_item->lw, slen);  
 
-   while ((r_item = _ui_find_r_item(ui_grp, &n_rid, id)) != NULL) {
-      int i, x, y, w, h, lw;
-
-      x  = r_item->x;  y = r_item->y;
-      w  = r_item->w;  h = r_item->h;
-      lw = r_item->lw;
-      
-      n_sid = 0;
-      while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
-         int slen = strlen(s_item->str);
-
-         /* scale = -1 이면 최대 스케일을 구하여 표시한다 */
-         if (s_item->scale < 0)
-            s_item->scale = _ui_str_scale (w, h, lw, slen);  
-
-         if (s_item->x_off < 0) {
-            slen = slen * FONT_ASCII_WIDTH * s_item->scale;
-            *px = x + ((w - slen) / 2);
-         }
-         else
-            *px = x + s_item->x_off;
-
-         if (s_item->y_off < 0)
-            *py = y + ((h - FONT_HEIGHT * s_item->scale)) / 2;
-         else
-            *py = y + s_item->y_off;
-      }
+   if (s_item->x_off < 0) {
+      slen = slen * FONT_ASCII_WIDTH * s_item->scale;
+      s_item->x_off = ((r_item->w - slen) / 2);
    }
+
+   if (s_item->y_off < 0)
+      s_item->y_off = ((r_item->h - FONT_HEIGHT * s_item->scale)) / 2;
+
 }
 
+//------------------------------------------------------------------------------
+static void _ui_update_r (fb_info_t *fb, r_item_t *r_item)
+{
+   draw_fill_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
+                  r_item->rc.uint);
+   if (r_item->lw)
+      draw_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
+               r_item->lw, r_item->lc.uint);
+}
+
+//------------------------------------------------------------------------------
+static void _ui_update_s (fb_info_t *fb, s_item_t *s_item, int x, int y)
+{
+   draw_text (fb, x + s_item->x_off, y + s_item->y_off,
+            s_item->fc.uint, s_item->bc.uint,
+            s_item->scale, s_item->str);
+}
+
+//------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 static void _ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
 {
@@ -161,76 +162,73 @@ static void _ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
    s_item_t *s_item;
 
    while ((r_item = _ui_find_r_item(ui_grp, &n_rid, id)) != NULL) {
-      draw_fill_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
-                     r_item->rc.uint);
-      if (r_item->lw)
-         draw_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
-                  r_item->lw, r_item->lc.uint);
+
+      _ui_update_r (fb, r_item);
 
       n_sid = 0;
       while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
-         int x, y;
-
          if (s_item->f_type < 0)
             s_item->f_type = ui_grp->f_type;
-         if (s_item->bc.uint < 0)
+
+         if ((signed)s_item->bc.uint < 0)
             s_item->bc.uint = r_item->rc.uint;
 
          set_font(s_item->f_type);
 
-         _ui_str_pos_xy(ui_grp, id, &x, &y);
-         draw_text (fb,
-                  x, y, s_item->fc.uint, s_item->bc.uint,
-                  s_item->scale, s_item->str);
+         _ui_str_pos_xy(r_item, s_item);
+         _ui_update_s (fb, s_item, r_item->x, r_item->y);
       }
    }
 }
 
 //------------------------------------------------------------------------------
 void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
-                  int id, int scale, int font, char *fmt, ...)
+                  int id, int x, int y, int scale, int font, char *fmt, ...)
 {
-   int n_sid = 0;
+   int n_sid = 0, n_rid = 0;
    s_item_t *s_item;
+   r_item_t *r_item;
 
-   while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
-      va_list va;
-      int x, y;
-      char buf[ITEM_STR_MAX];
+   while ((r_item = _ui_find_r_item(ui_grp, &n_rid, id)) != NULL) {
+      n_sid = 0;
+      while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
+         va_list va;
+         char buf[ITEM_STR_MAX];
 
-      /* 받아온 string 변환 하여 buf에 저장 */
-      memset(buf, 0x00, sizeof(buf));
-      va_start(va, fmt);
-      vsprintf(buf, fmt, va);
-      va_end(va);
+         /* 받아온 string 변환 하여 buf에 저장 */
+         memset(buf, 0x00, sizeof(buf));
+         va_start(va, fmt);
+         vsprintf(buf, fmt, va);
+         va_end(va);
 
-      if (scale)
-         s_item->scale = scale;
+         if (scale)
+            s_item->scale = scale;
 
-      if (font) {
-         s_item->f_type = (font < 0) ? ui_grp->f_type : font;
-         set_font(s_item->f_type);
+         if (font) {
+            s_item->f_type = (font < 0) ? ui_grp->f_type : font;
+            set_font(s_item->f_type);
+         }
+
+         s_item->x_off = (x != 0) ? x : s_item->x_off;
+         s_item->y_off = (y != 0) ? x : s_item->y_off;
+
+         if (strlen(s_item->str) > strlen(buf)) {
+            /* 기존 String을 배경색으로 다시 그림(텍스트 지움) */
+            /* string x, y 좌표 연산 */
+            int color = s_item->fc.uint;
+            s_item->fc.uint = s_item->bc.uint;
+            _ui_str_pos_xy(r_item, s_item);
+            _ui_update_s (fb, s_item, r_item->x, r_item->y);
+            s_item->fc.uint = color;
+            memset (s_item->str, 0x00, ITEM_STR_MAX);
+         }
+
+         /* 새로운 string 복사 */
+         strncpy(s_item->str, buf, strlen(buf));
+
+         _ui_str_pos_xy(r_item, s_item);
+         _ui_update_s (fb, s_item, r_item->x, r_item->y);
       }
-
-      if (strlen(s_item->str) > strlen(buf)) {
-         /* 기존 String을 배경색으로 다시 그림(텍스트 지움) */
-         /* string x, y 좌표 연산 */
-         _ui_str_pos_xy(ui_grp, id, &x, &y);
-
-         draw_text (fb,
-            x, y, s_item->bc.uint, s_item->bc.uint,
-            s_item->scale, s_item->str);
-         memset (s_item->str, 0x00, ITEM_STR_MAX);
-      }
-
-      /* 새로운 string 복사 */
-      strncpy(s_item->str, buf, strlen(buf));
-      /* 새로운 string x, y 표시좌표 연산 */
-      _ui_str_pos_xy(ui_grp, id, &x, &y);
-      draw_text (fb,
-         x, y, s_item->fc.uint, s_item->bc.uint,
-         s_item->scale, s_item->str);
-
    }
 }
 
@@ -350,8 +348,6 @@ static void _ui_parser_cmd_S (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 
    if ((signed)ui_grp->s_item[s_cnt].fc.uint < 0)
       ui_grp->s_item[s_cnt].fc.uint = ui_grp->fc.uint;
-   if ((signed)ui_grp->s_item[s_cnt].bc.uint < 0)
-      ui_grp->s_item[s_cnt].fc.uint = ui_grp->rc.uint;
 
    /* 문자열이 없거나 앞부분의 공백이 있는 경우 제거 */
    if ((ptr = strtok (NULL, ",")) != NULL) {
