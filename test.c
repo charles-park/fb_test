@@ -295,7 +295,7 @@ int main(int argc, char **argv)
 	for (i = 100; i > 0; i--) {
 //void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
 //                  int id, int x, int y, int scale, int font, char *fmt, ...)
-		ui_set_str(pfb, ui_grp, 1, -1, -1, -1, 2, "한글 count=%d 입니다.\0", i);
+		ui_set_str(pfb, ui_grp, 1, -1, -1, -1, 2, "한글을 count=%d 중 입니다.", i);
 		usleep(100000);
 	}
 }

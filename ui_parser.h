@@ -6,6 +6,7 @@
 //------------------------------------------------------------------------------
 #define	ITEM_COUNT_MAX	64
 #define	ITEM_STR_MAX	64
+#define	ITEM_SCALE_MAX	100
 
 //------------------------------------------------------------------------------
 typedef struct rect_item__t {
@@ -14,7 +15,7 @@ typedef struct rect_item__t {
 }	r_item_t;
 
 typedef struct string_item__t {
-	int				r_id, x_off, y_off, scale, f_type;
+	int				r_id, x, y, scale, f_type;
 	fb_color_u		fc, bc;
 	char            str[ITEM_STR_MAX];
 }	s_item_t;
@@ -27,9 +28,11 @@ typedef struct ui_group__t {
 }	ui_grp_t;
 
 //------------------------------------------------------------------------------
-extern void         ui_update   (fb_info_t *fb, ui_grp_t *ui_grp, int id);
-extern void         ui_close    (ui_grp_t *ui_grp);
-extern ui_grp_t     *ui_init    (fb_info_t *fb, const char *cfg_filename);
+extern	void        ui_set_str	(fb_info_t *fb, ui_grp_t *ui_grp,
+                                 int id, int x, int y, int scale, int font, char *fmt, ...);
+extern	void        ui_update   (fb_info_t *fb, ui_grp_t *ui_grp, int id);
+extern	void        ui_close    (ui_grp_t *ui_grp);
+extern	ui_grp_t	*ui_init    (fb_info_t *fb, const char *cfg_filename);
 
 //------------------------------------------------------------------------------
 
