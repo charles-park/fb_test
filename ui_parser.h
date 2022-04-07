@@ -10,7 +10,7 @@
 //------------------------------------------------------------------------------
 typedef struct rect_item__t {
 	int				id, x, y, w, h, lw;
-	fb_color_u		rc, lc;
+	fb_color_u		bc, lc;
 }	r_item_t;
 
 typedef struct string_item__t {
@@ -21,7 +21,7 @@ typedef struct string_item__t {
 
 typedef struct ui_group__t {
 	int             r_cnt, s_cnt, f_type;
-    fb_color_u      fc, rc, lc;
+    fb_color_u      fc, bc, lc;
 	r_item_t		r_item[ITEM_COUNT_MAX];
 	s_item_t		s_item[ITEM_COUNT_MAX];
 }	ui_grp_t;

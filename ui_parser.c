@@ -115,14 +115,34 @@ static s_item_t *_ui_find_s_item (ui_grp_t *ui_grp, int *sid, int fid)
 }
 
 //------------------------------------------------------------------------------
+static int my_strlen(char *str)
+{
+   int cnt = 0, err = 512;
+#if 0
+{
+   int i = 0;
+   for (i = 0; i < strlen(str); i++)
+      printf("%02x ", *(str+i));
+   
+   printf("\n");
+}
+#endif
+   /* utf-8 에서 한글표현은 3바이트 */
+   while ((*str != 0x00) && err--) {
+      if (*str & 0x80)   {
+         str += 3;   cnt += 2;
+      }
+      else  {
+         str += 1;   cnt++;
+      }
+   }
+   return err ? cnt : 0;
+}
+
+//------------------------------------------------------------------------------
 static void _ui_str_pos_xy (r_item_t *r_item, s_item_t *s_item)
 {
-   int slen = strlen(s_item->str);
-
-   /* scale = -1 이면 최대 스케일을 구하여 표시한다 */
-   if (s_item->scale < 0)
-      s_item->scale = _ui_str_scale (r_item->w, r_item->h,
-                                    r_item->lw, slen);  
+   int slen = my_strlen(s_item->str);
 
    if (s_item->x_off < 0) {
       slen = slen * FONT_ASCII_WIDTH * s_item->scale;
@@ -131,14 +151,13 @@ static void _ui_str_pos_xy (r_item_t *r_item, s_item_t *s_item)
 
    if (s_item->y_off < 0)
       s_item->y_off = ((r_item->h - FONT_HEIGHT * s_item->scale)) / 2;
-
 }
 
 //------------------------------------------------------------------------------
 static void _ui_update_r (fb_info_t *fb, r_item_t *r_item)
 {
    draw_fill_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
-                  r_item->rc.uint);
+                  r_item->bc.uint);
    if (r_item->lw)
       draw_rect (fb, r_item->x, r_item->y, r_item->w, r_item->h,
                r_item->lw, r_item->lc.uint);
@@ -161,24 +180,53 @@ static void _ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
    r_item_t *r_item;
    s_item_t *s_item;
 
-   while ((r_item = _ui_find_r_item(ui_grp, &n_rid, id)) != NULL) {
+   if (id < ITEM_COUNT_MAX) {
+      while ((r_item = _ui_find_r_item(ui_grp, &n_rid, id)) != NULL) {
 
-      _ui_update_r (fb, r_item);
+         _ui_update_r (fb, r_item);
 
-      n_sid = 0;
-      while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
-         if (s_item->f_type < 0)
-            s_item->f_type = ui_grp->f_type;
+         n_sid = 0;
+         while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
+            if (s_item->f_type < 0)
+               s_item->f_type = ui_grp->f_type;
 
-         if ((signed)s_item->bc.uint < 0)
-            s_item->bc.uint = r_item->rc.uint;
+            if ((signed)s_item->bc.uint < 0)
+               s_item->bc.uint = r_item->bc.uint;
 
-         set_font(s_item->f_type);
+            set_font(s_item->f_type);
 
-         _ui_str_pos_xy(r_item, s_item);
-         _ui_update_s (fb, s_item, r_item->x, r_item->y);
+            if (s_item->scale < 0)
+               s_item->scale = _ui_str_scale (r_item->w, r_item->h, r_item->lw,
+                                             my_strlen(s_item->str));
+            _ui_str_pos_xy(r_item, s_item);
+            _ui_update_s (fb, s_item, r_item->x, r_item->y);
+         }
       }
    }
+   else {
+      int i;
+      for (i = 0; i < ui_grp->r_cnt; i++)
+         if (id == ui_grp->r_item[i].id)
+            _ui_update_r (fb, &ui_grp->r_item[i]);
+
+      for (i = 0; i < ui_grp->s_cnt; i++)
+         if (id == ui_grp->s_item[i].r_id)
+            _ui_update_s (fb, &ui_grp->s_item[i], 0, 0);
+   }
+}
+
+//------------------------------------------------------------------------------
+static void _ui_clr_str (fb_info_t *fb, r_item_t *r_item, s_item_t *s_item)
+{
+   int color = s_item->fc.uint;
+
+   /* 기존 String을 배경색으로 다시 그림(텍스트 지움) */
+   /* string x, y 좌표 연산 */
+   s_item->fc.uint = s_item->bc.uint;
+   _ui_str_pos_xy(r_item, s_item);
+   _ui_update_s (fb, s_item, r_item->x, r_item->y);
+   s_item->fc.uint = color;
+   memset (s_item->str, 0x00, ITEM_STR_MAX);
 }
 
 //------------------------------------------------------------------------------
@@ -194,34 +242,39 @@ void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
       while ((s_item = _ui_find_s_item(ui_grp, &n_sid, id)) != NULL) {
          va_list va;
          char buf[ITEM_STR_MAX];
+         int n_scale = s_item->scale;
 
-         /* 받아온 string 변환 하여 buf에 저장 */
+         /* 받아온 가변인자를 string 형태로 변환 하여 buf에 저장 */
          memset(buf, 0x00, sizeof(buf));
-         va_start(va, fmt);
-         vsprintf(buf, fmt, va);
-         va_end(va);
+         va_start(va, fmt);   vsprintf(buf, fmt, va); va_end(va);
 
-         if (scale)
-            s_item->scale = scale;
+         if (scale) {
+            /* scale = -1 이면 최대 스케일을 구하여 표시한다 */
+            if (scale < 0)
+               n_scale = _ui_str_scale (r_item->w, r_item->h,
+                                             r_item->lw, my_strlen(buf));  
+            else
+               n_scale = scale;
+
+            if (s_item->scale > n_scale)
+               _ui_clr_str (fb, r_item, s_item);
+         }
 
          if (font) {
             s_item->f_type = (font < 0) ? ui_grp->f_type : font;
             set_font(s_item->f_type);
          }
 
+         /*
+            기존 문자열 보다 새로운 문자열이 더 작은 경우
+            기존 문자열을 배경색으로 덮어 씌운다.
+         */
+         if ((strlen(s_item->str) > strlen(buf)) || n_scale != s_item->scale) {
+            _ui_clr_str (fb, r_item, s_item);
+            s_item->scale = n_scale;
+         }
          s_item->x_off = (x != 0) ? x : s_item->x_off;
          s_item->y_off = (y != 0) ? x : s_item->y_off;
-
-         if (strlen(s_item->str) > strlen(buf)) {
-            /* 기존 String을 배경색으로 다시 그림(텍스트 지움) */
-            /* string x, y 좌표 연산 */
-            int color = s_item->fc.uint;
-            s_item->fc.uint = s_item->bc.uint;
-            _ui_str_pos_xy(r_item, s_item);
-            _ui_update_s (fb, s_item, r_item->x, r_item->y);
-            s_item->fc.uint = color;
-            memset (s_item->str, 0x00, ITEM_STR_MAX);
-         }
 
          /* 새로운 string 복사 */
          strncpy(s_item->str, buf, strlen(buf));
@@ -233,25 +286,28 @@ void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
 }
 
 //------------------------------------------------------------------------------
-void ui_set_color (fb_info_t *fb, ui_grp_t *ui_grp,
-                  int id, int fc, int rc, int lc)
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+void ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
 {
-   int i;
+   int i, sid, fid;
+   r_item_t *r_item;
 
-   for (i = 0; i < ui_grp->r_cnt; i++) {
-      if (id == ui_grp->r_item[i].id) {
-         ui_grp->r_item[i].rc.uint = (rc < 0) ? ui_grp->rc.uint : rc;
-         ui_grp->r_item[i].lc.uint = (lc < 0) ? ui_grp->lc.uint : lc;
+   if (id < 0) {
+      for (i = 0; i < ui_grp->r_cnt; i++)
+         _ui_update (fb, ui_grp, i);
+
+      for (i = 0; i < ui_grp->s_cnt; i++) {
+         if (ui_grp->s_item[i].r_id >= ITEM_COUNT_MAX)
+            _ui_update_s (fb, &ui_grp->s_item[i], 0, 0);
       }
    }
-   for (i = 0; i < ui_grp->s_cnt; i++) {
-      if (id == ui_grp->s_item[i].r_id) {
-         ui_grp->s_item[i].fc.uint = (fc < 0) ? ui_grp->fc.uint : fc;
-      }
-   }
+   else
+      _ui_update (fb, ui_grp, id);
+
 }
 
-//------------------------------------------------------------------------------
+#if 0
 void ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
 {
    int i;
@@ -262,8 +318,9 @@ void ui_update (fb_info_t *fb, ui_grp_t *ui_grp, int id)
    }
    else
       _ui_update (fb, ui_grp, id);
-}
 
+}
+#endif
 //------------------------------------------------------------------------------
 void ui_close (ui_grp_t *ui_grp)
 {
@@ -272,16 +329,6 @@ void ui_close (ui_grp_t *ui_grp)
 }
 
 //------------------------------------------------------------------------------
-static int _ui_file_sign_check (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
-{
-   char *ptr = strtok (buf, ",");
-
-   if(strncmp("ODROID-UI-CONFIG", buf, strlen(ptr)))
-      return -1;
-
-   return 0;
-}
-
 //------------------------------------------------------------------------------
 static void _ui_parser_cmd_C (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 {
@@ -289,7 +336,7 @@ static void _ui_parser_cmd_C (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 
    ptr = strtok (NULL, ",");     fb->is_bgr  = (atoi(ptr) != 0) ? 1: 0;
    ptr = strtok (NULL, ",");     ui_grp->fc.uint = strtol(ptr, NULL, 16);
-   ptr = strtok (NULL, ",");     ui_grp->rc.uint = strtol(ptr, NULL, 16);
+   ptr = strtok (NULL, ",");     ui_grp->bc.uint = strtol(ptr, NULL, 16);
    ptr = strtok (NULL, ",");     ui_grp->lc.uint = strtol(ptr, NULL, 16);
    ptr = strtok (NULL, ",");     ui_grp->f_type = atoi(ptr);
 
@@ -309,7 +356,7 @@ static void _ui_parser_cmd_R (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
    ptr = strtok (NULL, ",");     ui_grp->r_item[r_cnt].h    = atoi(ptr);
    ptr = strtok (NULL, ",");
 
-   ui_grp->r_item[r_cnt].rc.uint  = strtol(ptr, NULL, 16);
+   ui_grp->r_item[r_cnt].bc.uint  = strtol(ptr, NULL, 16);
    ptr = strtok (NULL, ",");     ui_grp->r_item[r_cnt].lw   = atoi(ptr);
 
    ptr = strtok (NULL, ",");
@@ -320,8 +367,8 @@ static void _ui_parser_cmd_R (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
    ui_grp->r_item[r_cnt].w = (ui_grp->r_item[r_cnt].w * fb->w / 100);
    ui_grp->r_item[r_cnt].h = (ui_grp->r_item[r_cnt].h * fb->h / 100);
 
-   if ((signed)ui_grp->r_item[r_cnt].rc.uint < 0)
-      ui_grp->r_item[r_cnt].rc.uint = ui_grp->rc.uint;
+   if ((signed)ui_grp->r_item[r_cnt].bc.uint < 0)
+      ui_grp->r_item[r_cnt].bc.uint = ui_grp->bc.uint;
 
    if ((signed)ui_grp->r_item[r_cnt].lc.uint < 0)
       ui_grp->r_item[r_cnt].lc.uint = ui_grp->lc.uint;
@@ -352,21 +399,34 @@ static void _ui_parser_cmd_S (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
    /* 문자열이 없거나 앞부분의 공백이 있는 경우 제거 */
    if ((ptr = strtok (NULL, ",")) != NULL) {
       int slen = strlen(ptr);
+
       while ((*ptr == 0x20) && slen--)
          ptr++;
-      strncpy(ui_grp->s_item[s_cnt].str, ptr, strlen(ptr));
+      strncpy(ui_grp->s_item[s_cnt].str, ptr, slen);
    }
-
    ptr = strtok (NULL, ",");     ui_grp->s_item[s_cnt].f_type = atoi(ptr);
+
+   if (ui_grp->s_item[s_cnt].r_id >= ITEM_COUNT_MAX) {
+      if (ui_grp->s_item[s_cnt].x_off < 0)   ui_grp->s_item[s_cnt].x_off = 0;
+      if (ui_grp->s_item[s_cnt].y_off < 0)   ui_grp->s_item[s_cnt].y_off = 0;
+      if (ui_grp->s_item[s_cnt].scale < 0)   ui_grp->s_item[s_cnt].scale = 1;
+      if (ui_grp->s_item[s_cnt].f_type < 0)
+         ui_grp->s_item[s_cnt].f_type  = ui_grp->f_type;
+      if (ui_grp->s_item[s_cnt].fc.uint < 0)
+         ui_grp->s_item[s_cnt].fc.uint = ui_grp->fc.uint;
+      if (ui_grp->s_item[s_cnt].bc.uint < 0)
+         ui_grp->s_item[s_cnt].bc.uint = ui_grp->bc.uint;
+   }
    s_cnt++;
    ui_grp->s_cnt = s_cnt;
+
 }
 
 //------------------------------------------------------------------------------
 static void _ui_parser_cmd_G (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
 {
    int pos = ui_grp->r_cnt;
-   int s_h, r_h, sid, r_cnt, g_cnt, rc, lw, lc, i, j, y_s;
+   int s_h, r_h, sid, r_cnt, g_cnt, bc, lw, lc, i, j, y_s;
    char *ptr = strtok (buf, ",");
 
    ptr = strtok (NULL, ",");     sid   = atoi(ptr);
@@ -374,7 +434,7 @@ static void _ui_parser_cmd_G (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
    ptr = strtok (NULL, ",");     s_h   = atoi(ptr);
    ptr = strtok (NULL, ",");     r_h   = atoi(ptr);
    ptr = strtok (NULL, ",");     g_cnt = atoi(ptr);
-   ptr = strtok (NULL, ",");     rc    = strtol(ptr, NULL, 16);
+   ptr = strtok (NULL, ",");     bc    = strtol(ptr, NULL, 16);
    ptr = strtok (NULL, ",");     lw    = atoi(ptr);
    ptr = strtok (NULL, ",");     lc    = strtol(ptr, NULL, 16);
 
@@ -391,7 +451,7 @@ static void _ui_parser_cmd_G (char *buf, fb_info_t *fb, ui_grp_t *ui_grp)
          ui_grp->r_item[pos].y  = ui_grp->r_item[pos].h * i + y_s;
          ui_grp->r_item[pos].lw = lw;
 
-         ui_grp->r_item[pos].rc.uint = rc < 0 ? ui_grp->rc.uint : rc;
+         ui_grp->r_item[pos].bc.uint = bc < 0 ? ui_grp->bc.uint : bc;
          ui_grp->r_item[pos].lc.uint = lc < 0 ? ui_grp->lc.uint : lc;
       }
    }
