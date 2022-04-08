@@ -290,15 +290,17 @@ int main(int argc, char **argv)
 	ui_update(pfb, ui_grp, -1);
 	sleep(1);
 
+#if 0
 {
 	int i = 0;
 	for (i = 100; i > 0; i--) {
 //void ui_set_str (fb_info_t *fb, ui_grp_t *ui_grp,
 //                  int id, int x, int y, int scale, int font, char *fmt, ...)
-		ui_set_str(pfb, ui_grp, 1, -1, -1, -1, 2, "한글을 count=%d 중 입니다.", i);
+		ui_set_str(pfb, ui_grp, 1, -1, -1, -1, 2, "한글 count=%d 중 입니다.", i);
 		usleep(100000);
 	}
 }
+#endif
 	fb_close (pfb);
 	ui_close(ui_grp);
 
